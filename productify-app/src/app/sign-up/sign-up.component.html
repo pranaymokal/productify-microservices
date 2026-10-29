@@ -1,0 +1,92 @@
+<div class="auth-container">
+  <p-card header="Create an Account" subheader="Join Productify platform">
+    <div *ngIf="errorMessage" class="error-banner">
+      <i class="pi pi-exclamation-circle"></i>
+      <span>{{ errorMessage }}</span>
+    </div>
+
+    <div *ngIf="successMessage" class="success-banner">
+      <i class="pi pi-check-circle"></i>
+      <span>{{ successMessage }}</span>
+    </div>
+
+    <form [formGroup]="signUpForm" (ngSubmit)="onSubmit()">
+      <div class="form-row">
+        <div class="form-group flex-1">
+          <label for="firstName">First Name</label>
+          <input id="firstName" type="text" pInputText formControlName="firstName" placeholder="First name" class="w-full" />
+          <small *ngIf="signUpForm.get('firstName')?.invalid && signUpForm.get('firstName')?.touched" class="field-error">
+            First name is required.
+          </small>
+        </div>
+
+        <div class="form-group flex-1">
+          <label for="lastName">Last Name</label>
+          <input id="lastName" type="text" pInputText formControlName="lastName" placeholder="Last name" class="w-full" />
+          <small *ngIf="signUpForm.get('lastName')?.invalid && signUpForm.get('lastName')?.touched" class="field-error">
+            Last name is required.
+          </small>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input id="username" type="text" pInputText formControlName="username" placeholder="Choose a username" class="w-full" />
+        <small *ngIf="signUpForm.get('username')?.invalid && signUpForm.get('username')?.touched" class="field-error">
+          Username must be 3-20 characters.
+        </small>
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input id="email" type="email" pInputText formControlName="email" placeholder="you@example.com" class="w-full" />
+        <small *ngIf="signUpForm.get('email')?.invalid && signUpForm.get('email')?.touched" class="field-error">
+          A valid email address is required.
+        </small>
+      </div>
+
+      <div class="form-group">
+        <label for="mobile">Mobile Number (10 digits)</label>
+        <input id="mobile" type="text" pInputText formControlName="mobile" placeholder="e.g. 9876543210" class="w-full" />
+        <small *ngIf="signUpForm.get('mobile')?.invalid && signUpForm.get('mobile')?.touched" class="field-error">
+          Valid 10-digit mobile number required.
+        </small>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group flex-1">
+          <label for="password">Password</label>
+          <input id="password" type="password" pInputText formControlName="password" placeholder="At least 8 chars" class="w-full" />
+          <small *ngIf="signUpForm.get('password')?.invalid && signUpForm.get('password')?.touched" class="field-error">
+            Password must be at least 8 characters.
+          </small>
+        </div>
+
+        <div class="form-group flex-1">
+          <label for="confirmPassword">Confirm Password</label>
+          <input id="confirmPassword" type="password" pInputText formControlName="confirmPassword" placeholder="Confirm password" class="w-full" />
+          <small *ngIf="signUpForm.get('confirmPassword')?.invalid && signUpForm.get('confirmPassword')?.touched" class="field-error">
+            Confirmation required.
+          </small>
+        </div>
+      </div>
+
+      <div class="action-buttons">
+        <button
+          pButton
+          type="submit"
+          label="Create Account"
+          icon="pi pi-user-plus"
+          [loading]="isLoading"
+          [disabled]="signUpForm.invalid || isLoading"
+          class="w-full"
+        ></button>
+      </div>
+
+      <div class="footer-links">
+        <span>Already have an account? </span>
+        <a routerLink="/sign-in">Sign In</a>
+      </div>
+    </form>
+  </p-card>
+</div>

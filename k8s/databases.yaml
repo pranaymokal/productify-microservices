@@ -1,0 +1,383 @@
+# ====================================================
+# DATABASE CONFIGMAP & SECRETS
+# ====================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: database-config
+  labels:
+    app.kubernetes.io/part-of: microservices-platform
+data:
+  USER_DATABASE: "user"
+  PRODUCT_DATABASE: "product"
+  ORDER_DATABASE: "order"
+  ANALYTICS_DATABASE: "analytics"
+  MONGO_INITDB_ROOT_USERNAME: "root"
+  REDIS_USERNAME: "default"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: database-secret
+  labels:
+    app.kubernetes.io/part-of: microservices-platform
+type: Opaque
+stringData:
+  MYSQL_ROOT_PASSWORD: "root@123"
+  MONGO_INITDB_ROOT_PASSWORD: "root123"
+  REDIS_PASSWORD: "root@123"
+---
+# ====================================================
+# USER MYSQL (StatefulSet & Service)
+# ====================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-mysql
+  labels:
+    app: user-mysql
+spec:
+  ports:
+    - port: 3306
+      targetPort: 3306
+  selector:
+    app: user-mysql
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: user-mysql
+spec:
+  serviceName: user-mysql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user-mysql
+  template:
+    metadata:
+      labels:
+        app: user-mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: MYSQL_ROOT_PASSWORD
+        - name: MYSQL_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: USER_DATABASE
+        ports:
+        - containerPort: 3306
+        volumeMounts:
+        - name: user-mysql-data
+          mountPath: /var/lib/mysql
+  volumeClaimTemplates:
+  - metadata:
+      name: user-mysql-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 2Gi
+---
+# ====================================================
+# PRODUCT MYSQL (StatefulSet & Service)
+# ====================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-mysql
+  labels:
+    app: product-mysql
+spec:
+  ports:
+    - port: 3306
+      targetPort: 3306
+  selector:
+    app: product-mysql
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: product-mysql
+spec:
+  serviceName: product-mysql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: product-mysql
+  template:
+    metadata:
+      labels:
+        app: product-mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: MYSQL_ROOT_PASSWORD
+        - name: MYSQL_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: PRODUCT_DATABASE
+        ports:
+        - containerPort: 3306
+        volumeMounts:
+        - name: product-mysql-data
+          mountPath: /var/lib/mysql
+  volumeClaimTemplates:
+  - metadata:
+      name: product-mysql-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 2Gi
+---
+# ====================================================
+# ORDER MYSQL (StatefulSet & Service)
+# ====================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-mysql
+  labels:
+    app: order-mysql
+spec:
+  ports:
+    - port: 3306
+      targetPort: 3306
+  selector:
+    app: order-mysql
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: order-mysql
+spec:
+  serviceName: order-mysql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: order-mysql
+  template:
+    metadata:
+      labels:
+        app: order-mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: MYSQL_ROOT_PASSWORD
+        - name: MYSQL_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: ORDER_DATABASE
+        ports:
+        - containerPort: 3306
+        volumeMounts:
+        - name: order-mysql-data
+          mountPath: /var/lib/mysql
+  volumeClaimTemplates:
+  - metadata:
+      name: order-mysql-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 2Gi
+---
+# ====================================================
+# ANALYTICS MYSQL (StatefulSet & Service)
+# ====================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-mysql
+  labels:
+    app: analytics-mysql
+spec:
+  ports:
+    - port: 3306
+      targetPort: 3306
+  selector:
+    app: analytics-mysql
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: analytics-mysql
+spec:
+  serviceName: analytics-mysql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: analytics-mysql
+  template:
+    metadata:
+      labels:
+        app: analytics-mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: MYSQL_ROOT_PASSWORD
+        - name: MYSQL_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: ANALYTICS_DATABASE
+        ports:
+        - containerPort: 3306
+        volumeMounts:
+        - name: analytics-mysql-data
+          mountPath: /var/lib/mysql
+  volumeClaimTemplates:
+  - metadata:
+      name: analytics-mysql-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 2Gi
+---
+# ====================================================
+# CART MONGODB (StatefulSet & Service)
+# ====================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: cart-mongo
+  labels:
+    app: cart-mongo
+spec:
+  ports:
+    - port: 27017
+      targetPort: 27017
+  selector:
+    app: cart-mongo
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cart-mongo
+spec:
+  serviceName: cart-mongo
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cart-mongo
+  template:
+    metadata:
+      labels:
+        app: cart-mongo
+    spec:
+      containers:
+      - name: mongo
+        image: mongo:6.0
+        env:
+        - name: MONGO_INITDB_ROOT_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: MONGO_INITDB_ROOT_USERNAME
+        - name: MONGO_INITDB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: MONGO_INITDB_ROOT_PASSWORD
+        ports:
+        - containerPort: 27017
+        volumeMounts:
+        - name: cart-mongo-data
+          mountPath: /data/db
+  volumeClaimTemplates:
+  - metadata:
+      name: cart-mongo-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 2Gi
+---
+# ====================================================
+# REDIS (Deployment & Service for Caching & Rate Limiting)
+# ====================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  labels:
+    app: redis
+spec:
+  ports:
+    - port: 6379
+      targetPort: 6379
+  selector:
+    app: redis
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  labels:
+    app: redis
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        imagePullPolicy: IfNotPresent
+        command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\""]
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: REDIS_PASSWORD
+        ports:
+        - containerPort: 6379
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+

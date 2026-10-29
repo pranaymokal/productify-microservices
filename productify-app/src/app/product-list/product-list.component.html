@@ -1,0 +1,19 @@
+<p-panel header="Product List">
+    <p-listbox [options]="products" [(ngModel)]="selectedProduct" optionLabel="productName">
+        <ng-template let-product pTemplate="item">
+            <div class="p-d-flex p-ai-center p-jc-between">
+                <div>
+                    <div>{{ product.productName }}</div>
+                    <small>{{ product.productPrice | currency:'INR' }}</small>
+                </div>
+                <button pButton type="button" label="Add to Cart" icon="pi pi-shopping-cart" (click)="addToCart(product)"></button>
+            </div>
+        </ng-template>
+    </p-listbox>
+</p-panel>
+
+<div class="pagination">
+    <button (click)="onPageChange(page - 1)" [disabled]="page === 0">Previous</button>
+    <span>Page {{ page + 1 }} of {{ totalPages }}</span>
+    <button (click)="onPageChange(page + 1)" [disabled]="page + 1 >= totalPages">Next</button>
+</div>

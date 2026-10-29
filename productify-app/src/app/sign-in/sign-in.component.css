@@ -1,0 +1,85 @@
+.auth-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 70vh;
+  padding: 1.5rem;
+}
+
+:host ::ng-deep .p-card {
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+:host ::ng-deep .p-card-header,
+:host ::ng-deep .p-card-title {
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: #1e293b;
+}
+
+:host ::ng-deep .p-card-subtitle {
+  color: #64748b;
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1.25rem;
+}
+
+.form-group label {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #334155;
+  margin-bottom: 0.35rem;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.field-error {
+  color: #ef4444;
+  font-size: 0.775rem;
+  margin-top: 0.25rem;
+}
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  margin-bottom: 1.25rem;
+}
+
+.action-buttons {
+  margin-top: 1.5rem;
+}
+
+.footer-links {
+  margin-top: 1.5rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.footer-links a {
+  color: #0284c7;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.footer-links a:hover {
+  text-decoration: underline;
+}

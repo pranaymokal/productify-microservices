@@ -1,0 +1,61 @@
+<div class="layout-wrapper">
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <span class="logo cursor-pointer" (click)="goToProducts()" routerLink="/products">🛍️ Productify</span>
+    </div>
+    <div class="header-right">
+      <ng-container *ngIf="isLoggedIn; else guestNav">
+        <span class="user-greeting">
+          <i class="pi pi-user"></i> {{ currentUsername }}
+        </span>
+        <button
+          pButton
+          type="button"
+          icon="pi pi-sign-out"
+          label="Logout"
+          class="p-button-outlined p-button-sm p-button-light"
+          (click)="signout()"
+        ></button>
+      </ng-container>
+      <ng-template #guestNav>
+        <button
+          pButton
+          type="button"
+          icon="pi pi-sign-in"
+          label="Sign In"
+          class="p-button-outlined p-button-sm p-button-light mr-2"
+          (click)="goToSignIn()"
+          routerLink="/sign-in"
+        ></button>
+        <button
+          pButton
+          type="button"
+          icon="pi pi-user-plus"
+          label="Sign Up"
+          class="p-button-sm p-button-secondary"
+          (click)="goToSignUp()"
+          routerLink="/signup"
+        ></button>
+      </ng-template>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <p-panelMenu [model]="menuItems"></p-panelMenu>
+    </aside>
+
+    <!-- Content Area -->
+    <section class="content">
+      <router-outlet></router-outlet>
+    </section>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <span>© 2026 Productify Microservices Platform. All rights reserved.</span>
+  </footer>
+</div>

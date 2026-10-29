@@ -1,0 +1,38 @@
+# 1. Start the databases and persistent disks
+kubectl apply -f databases.yaml
+
+# 2. Start Eureka and backend microservices
+kubectl apply -f microservices.yaml
+
+# 3. Start Frontend, Prometheus, and Grafana
+kubectl apply -f frontend-monitoring.yaml
+
+kubectl get pods -w
+
+
+kubectl port-forward svc/api-gateway-service 8081:8081
+
+kubectl port-forward svc/angular-ui 4200:80
+
+kubectl port-forward svc/prometheus 9090:9090
+
+kubectl port-forward svc/grafana 3000:3000
+
+
+
+2. Accessing Swagger in Kubernetes (Minikube or AKS)
+In Kubernetes, backend services run on internal cluster IPs (ClusterIP). To open Swagger UI in your browser on your machine, use kubectl port-forward:
+
+powershell
+# For Product Service (Port 8086)
+kubectl port-forward svc/product-service 8086:8086
+# For User Service (Port 8085)
+kubectl port-forward svc/user-service 8085:8085
+# For Order Service (Port 8087)
+kubectl port-forward svc/order-service 8087:8087
+# For Cart Service (Port 8084)
+kubectl port-forward svc/cart-service 8084:8084
+# For Auth Service (Port 8083)
+kubectl port-forward svc/auth-service 8083:8083
+# For Analytics Service (Port 8088)
+kubectl port-forward svc/analytics-service 8088:8088

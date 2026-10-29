@@ -1,0 +1,31 @@
+<p-card header="Add Product">
+    <form [formGroup]="addProductForm" (ngSubmit)="onSubmit()">
+        <table class="p-fluid">
+            <tr>
+                <td><label for="productName">Name</label></td>
+                <td><input id="productName" type="text" pInputText formControlName="productName" /></td>
+            </tr>
+            <tr>
+                <td><label for="productPrice">Price</label></td>
+                <td><input id="productPrice" type="number" pInputText formControlName="productPrice" /></td>
+            </tr>
+            <tr>
+                <td><label for="productDescription">Product Description</label></td>
+                <td><textarea id="productDescription" pInputTextarea formControlName="productDescription"></textarea></td>
+            </tr>
+            <tr>
+                <td><label for="stock">Stock</label></td>
+                <td><input id="stock" type="number" pInputText formControlName="stock" /></td>
+            </tr>
+            <tr>
+                <td><label for="category">Product Category</label></td>
+                <td><p-dropdown   placeholder="Select Category"  [options]="[{label: 'Clothing', value: 'clothing'},{label: 'Medical', value: 'medical'}, {label: 'Electronics', value: 'electronics'}]" formControlName="category"></p-dropdown></td>
+            </tr>
+            <tr>
+                <td colspan="2" style="text-align: right;">
+                    <button pButton type="submit" label="Add Product" [disabled]="addProductForm.invalid"></button>
+                </td>
+            </tr>
+        </table>
+    </form>
+</p-card>

@@ -1,0 +1,218 @@
+name: CI/CD Multi-Service Deploy to Azure Kubernetes Service (AKS)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'api-gateway-service/**'
+      - 'auth-service/**'
+      - 'cart-service/**'
+      - 'discovery-service/**'
+      - 'order-service/**'
+      - 'product-service/**'
+      - 'user-service/**'
+      - 'productify-app/**'
+      - 'k8s/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Select service to build and deploy (or all)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - discovery-service
+          - api-gateway-service
+          - auth-service
+          - user-service
+          - product-service
+          - order-service
+          - cart-service
+          - analytics-service
+          - productify-app
+
+env:
+  ACR_NAME: ${{ secrets.ACR_NAME }}
+  RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+  CLUSTER_NAME: ${{ secrets.AKS_CLUSTER_NAME }}
+
+jobs:
+  # --------------------------------------------------------------------------
+  # 1. Change Detection: Detect which services changed in this commit
+  # --------------------------------------------------------------------------
+  changes:
+    name: Detect Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.filter.outputs.changes }}
+      deploy_all: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.service == 'all' || github.event_name == 'push' && contains(github.event.head_commit.message, '[deploy-all]') }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Path Filters
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            discovery-service:
+              - 'discovery-service/**'
+            api-gateway-service:
+              - 'api-gateway-service/**'
+            auth-service:
+              - 'auth-service/**'
+            user-service:
+              - 'user-service/**'
+            product-service:
+              - 'product-service/**'
+            order-service:
+              - 'order-service/**'
+            cart-service:
+              - 'cart-service/**'
+            analytics-service:
+              - 'analytics-service/**'
+            productify-app:
+              - 'productify-app/**'
+            k8s:
+              - 'k8s/**'
+
+  # --------------------------------------------------------------------------
+  # 2. Build & Push: Concurrently build & push changed images to Azure ACR
+  # --------------------------------------------------------------------------
+  build-and-push:
+    name: Build & Push
+    needs: changes
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - discovery-service
+          - api-gateway-service
+          - auth-service
+          - user-service
+          - product-service
+          - order-service
+          - cart-service
+          - analytics-service
+          - productify-app
+    steps:
+      - name: Check if service should be built
+        id: check_run
+        run: |
+          MANUAL_CHOICE="${{ github.event.inputs.service }}"
+          DEPLOY_ALL="${{ needs.changes.outputs.deploy_all }}"
+          CHANGED="${{ contains(needs.changes.outputs.services, matrix.service) }}"
+
+          if [ "$MANUAL_CHOICE" = "all" ] || [ "$MANUAL_CHOICE" = "${{ matrix.service }}" ] || [ "$DEPLOY_ALL" = "true" ] || [ "$CHANGED" = "true" ]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Checkout Repository
+        if: steps.check_run.outputs.should_run == 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        if: steps.check_run.outputs.should_run == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Azure Container Registry (ACR)
+        if: steps.check_run.outputs.should_run == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ACR_NAME }}.azurecr.io
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build and Push Docker Image
+        if: steps.check_run.outputs.should_run == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.service }}
+          file: ./${{ matrix.service }}/dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ secrets.ACR_NAME }}.azurecr.io/${{ matrix.service }}:${{ github.sha }}
+            ${{ secrets.ACR_NAME }}.azurecr.io/${{ matrix.service }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # --------------------------------------------------------------------------
+  # 3. Deploy to AKS: Apply Manifests and Trigger Rolling Restarts
+  # --------------------------------------------------------------------------
+  deploy-to-aks:
+    name: Deploy to Azure Kubernetes Service
+    needs: [changes, build-and-push]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Azure CLI Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set AKS Context
+        uses: azure/aks-set-context@v3
+        with:
+          resource-group: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          cluster-name: ${{ secrets.AKS_CLUSTER_NAME }}
+
+      # 1. Databases, Storage & Redis StatefulSets
+      - name: Deploy Databases & In-Cluster Storage
+        run: |
+          kubectl apply -f k8s/databases.yaml
+
+      # 2. Update image references to point to ACR with immutable commit SHA
+      - name: Update Kubernetes Manifests with ACR Images
+        run: |
+          ACR_REGISTRY="${{ secrets.ACR_NAME }}.azurecr.io"
+          COMMIT_SHA="${{ github.sha }}"
+
+          echo "Rewriting image registries to $ACR_REGISTRY with tag $COMMIT_SHA..."
+
+          # Replace images in k8s/microservices.yaml
+          sed -i -E "s|image: ([a-z0-9_-]+):latest|image: ${ACR_REGISTRY}/\1:${COMMIT_SHA}|g" k8s/microservices.yaml
+
+          # Replace angular-ui / productify-app in k8s/frontend-monitoring.yaml
+          sed -i -E "s|image: productify-app:latest|image: ${ACR_REGISTRY}/productify-app:${COMMIT_SHA}|g" k8s/frontend-monitoring.yaml
+
+      # 3. Deploy Eureka Discovery, Gateways, and Business Services
+      - name: Deploy Microservices
+        run: |
+          kubectl apply -f k8s/microservices.yaml
+
+      # 4. Deploy Frontend, Prometheus, and Grafana
+      - name: Deploy Frontend & Monitoring
+        run: |
+          kubectl apply -f k8s/frontend-monitoring.yaml
+
+      # 5. Rollout Verification
+      - name: Verify Deployment Rollouts
+        run: |
+          echo "Verifying rollouts..."
+          kubectl rollout status deployment/discovery-service --timeout=180s
+          kubectl rollout status deployment/api-gateway-service --timeout=180s
+          kubectl rollout status deployment/auth-service --timeout=180s
+          kubectl rollout status deployment/user-service --timeout=180s
+          kubectl rollout status deployment/product-service --timeout=180s
+          kubectl rollout status deployment/order-service --timeout=180s
+          kubectl rollout status deployment/cart-service --timeout=180s
+          kubectl rollout status deployment/analytics-service --timeout=180s
+          kubectl rollout status deployment/angular-ui --timeout=180s
+
+      - name: Display Cluster Status
+        if: always()
+        run: |
+          kubectl get pods -o wide
+          kubectl get svc

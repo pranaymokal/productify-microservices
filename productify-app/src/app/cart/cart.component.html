@@ -1,0 +1,23 @@
+<div class="cart-container">
+    <h2>Shopping Cart</h2>
+    <ul>
+        <li *ngFor="let product of products">
+            <input 
+                type="checkbox" 
+                [(ngModel)]="product.selected" 
+                (change)="selectProduct(product)" 
+            />
+            {{ product.productName }} - {{ product.productPrice | currency:'INR'}}
+        </li>
+    </ul>
+    <button 
+        (click)="placeOrder()"
+    >
+        Place Order
+    </button>
+    <button style="margin-left: 20px;"
+        (click)="placeOrder()"
+    >
+        Remove from Cart
+    </button>
+</div>

@@ -1,0 +1,831 @@
+# ====================================================
+# MICROSERVICES CONFIGMAP & SECRETS
+# ====================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: microservices-config
+  labels:
+    app.kubernetes.io/part-of: microservices-platform
+data:
+  JAVA_TOOL_OPTIONS: "-XX:TieredStopAtLevel=1 -Xms128m -Xmx384m -Djava.security.egd=file:/dev/./urandom -Dmanagement.endpoints.web.exposure.include=health,info,metrics,prometheus -Dmanagement.endpoint.prometheus.enabled=true"
+  EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://discovery-service:8082/eureka/"
+  EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
+  SPRING_DATASOURCE_USERNAME: "root"
+  USER_DATASOURCE_URL: "jdbc:mysql://user-mysql:3306/user"
+  PRODUCT_DATASOURCE_URL: "jdbc:mysql://product-mysql:3306/product"
+  ORDER_DATASOURCE_URL: "jdbc:mysql://order-mysql:3306/order"
+  ANALYTICS_DATASOURCE_URL: "jdbc:mysql://analytics-mysql:3306/analytics"
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+  SPRING_DATA_REDIS_HOST: "redis"
+  SPRING_DATA_REDIS_PORT: "6379"
+  SPRING_DATA_REDIS_USERNAME: "default"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: microservices-secret
+  labels:
+    app.kubernetes.io/part-of: microservices-platform
+type: Opaque
+stringData:
+  JWT_SECRET_KEY: "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970"
+  SPRING_DATASOURCE_PASSWORD: "root@123"
+  SPRING_DATA_REDIS_PASSWORD: "root@123"
+  CART_MONGODB_URI: "mongodb://root:root123@cart-mongo:27017/cart-service?authSource=admin"
+---
+# ====================================================
+# DISCOVERY SERVICE (EUREKA)
+# ====================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: discovery-service
+  labels:
+    app: discovery-service
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: discovery-service
+  template:
+    metadata:
+      labels:
+        app: discovery-service
+    spec:
+      containers:
+      - name: discovery-service
+        image: discovery-service:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: JAVA_TOOL_OPTIONS
+        ports:
+        - containerPort: 8082
+        startupProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8082
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 60
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8082
+          periodSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8082
+          periodSeconds: 15
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "768Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: discovery-service
+  labels:
+    app: discovery-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8082
+      targetPort: 8082
+  selector:
+    app: discovery-service
+---
+# ====================================================
+# API GATEWAY SERVICE
+# ====================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway-service
+  labels:
+    app: api-gateway-service
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: api-gateway-service
+  template:
+    metadata:
+      labels:
+        app: api-gateway-service
+    spec:
+      containers:
+      - name: api-gateway-service
+        image: api-gateway-service:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: JAVA_TOOL_OPTIONS
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+        - name: EUREKA_INSTANCE_PREFER_IP_ADDRESS
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: EUREKA_INSTANCE_PREFER_IP_ADDRESS
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: microservices-secret
+              key: JWT_SECRET_KEY
+        - name: SPRING_DATA_REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: SPRING_DATA_REDIS_HOST
+        - name: SPRING_DATA_REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: SPRING_DATA_REDIS_PORT
+        - name: SPRING_DATA_REDIS_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: SPRING_DATA_REDIS_USERNAME
+        - name: SPRING_DATA_REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: microservices-secret
+              key: SPRING_DATA_REDIS_PASSWORD
+        ports:
+        - containerPort: 8081
+        startupProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 60
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8081
+          periodSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8081
+          periodSeconds: 15
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "768Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway-service
+  labels:
+    app: api-gateway-service
+spec:
+  type: NodePort
+  ports:
+    - port: 8081
+      targetPort: 8081
+      nodePort: 30081
+  selector:
+    app: api-gateway-service
+---
+# ====================================================
+# AUTH SERVICE
+# ====================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  labels:
+    app: auth-service
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+      - name: auth-service
+        image: auth-service:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: JAVA_TOOL_OPTIONS
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+        - name: EUREKA_INSTANCE_PREFER_IP_ADDRESS
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: EUREKA_INSTANCE_PREFER_IP_ADDRESS
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: microservices-secret
+              key: JWT_SECRET_KEY
+        ports:
+        - containerPort: 8083
+        startupProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8083
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 60
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8083
+          periodSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8083
+          periodSeconds: 15
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "768Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  labels:
+    app: auth-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8083
+      targetPort: 8083
+  selector:
+    app: auth-service
+---
+# ====================================================
+# CART SERVICE
+# ====================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cart-service
+  labels:
+    app: cart-service
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: cart-service
+  template:
+    metadata:
+      labels:
+        app: cart-service
+    spec:
+      containers:
+      - name: cart-service
+        image: cart-service:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: JAVA_TOOL_OPTIONS
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+        - name: EUREKA_INSTANCE_PREFER_IP_ADDRESS
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: EUREKA_INSTANCE_PREFER_IP_ADDRESS
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: microservices-secret
+              key: JWT_SECRET_KEY
+        - name: SPRING_DATA_MONGODB_URI
+          valueFrom:
+            secretKeyRef:
+              name: microservices-secret
+              key: CART_MONGODB_URI
+        ports:
+        - containerPort: 8084
+        startupProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8084
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 60
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8084
+          periodSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8084
+          periodSeconds: 15
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "768Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cart-service
+  labels:
+    app: cart-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8084
+      targetPort: 8084
+  selector:
+    app: cart-service
+---
+# ====================================================
+# USER SERVICE
+# ====================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+  labels:
+    app: user-service
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: user-service
+  template:
+    metadata:
+      labels:
+        app: user-service
+    spec:
+      containers:
+      - name: user-service
+        image: user-service:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: JAVA_TOOL_OPTIONS
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+        - name: EUREKA_INSTANCE_PREFER_IP_ADDRESS
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: EUREKA_INSTANCE_PREFER_IP_ADDRESS
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: microservices-secret
+              key: JWT_SECRET_KEY
+        - name: SPRING_DATASOURCE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: USER_DATASOURCE_URL
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: SPRING_DATASOURCE_USERNAME
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: microservices-secret
+              key: SPRING_DATASOURCE_PASSWORD
+        ports:
+        - containerPort: 8085
+        startupProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8085
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 60
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8085
+          periodSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8085
+          periodSeconds: 15
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "768Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+  labels:
+    app: user-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8085
+      targetPort: 8085
+  selector:
+    app: user-service
+---
+# ====================================================
+# PRODUCT SERVICE
+# ====================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service
+  labels:
+    app: product-service
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: product-service
+  template:
+    metadata:
+      labels:
+        app: product-service
+    spec:
+      containers:
+      - name: product-service
+        image: product-service:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: JAVA_TOOL_OPTIONS
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+        - name: EUREKA_INSTANCE_PREFER_IP_ADDRESS
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: EUREKA_INSTANCE_PREFER_IP_ADDRESS
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: microservices-secret
+              key: JWT_SECRET_KEY
+        - name: SPRING_DATASOURCE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: PRODUCT_DATASOURCE_URL
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: SPRING_DATASOURCE_USERNAME
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: microservices-secret
+              key: SPRING_DATASOURCE_PASSWORD
+        - name: SPRING_DATA_REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: SPRING_DATA_REDIS_HOST
+        - name: SPRING_DATA_REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: SPRING_DATA_REDIS_PORT
+        - name: SPRING_DATA_REDIS_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: SPRING_DATA_REDIS_USERNAME
+        - name: SPRING_DATA_REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: microservices-secret
+              key: SPRING_DATA_REDIS_PASSWORD
+        ports:
+        - containerPort: 8086
+        startupProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8086
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 60
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8086
+          periodSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8086
+          periodSeconds: 15
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "768Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-service
+  labels:
+    app: product-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8086
+      targetPort: 8086
+  selector:
+    app: product-service
+---
+# ====================================================
+# ORDER SERVICE
+# ====================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+  labels:
+    app: order-service
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: order-service
+  template:
+    metadata:
+      labels:
+        app: order-service
+    spec:
+      containers:
+      - name: order-service
+        image: order-service:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: JAVA_TOOL_OPTIONS
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+        - name: EUREKA_INSTANCE_PREFER_IP_ADDRESS
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: EUREKA_INSTANCE_PREFER_IP_ADDRESS
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: microservices-secret
+              key: JWT_SECRET_KEY
+        - name: SPRING_DATASOURCE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: ORDER_DATASOURCE_URL
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: SPRING_DATASOURCE_USERNAME
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: microservices-secret
+              key: SPRING_DATASOURCE_PASSWORD
+        ports:
+        - containerPort: 8087
+        startupProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8087
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 60
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8087
+          periodSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8087
+          periodSeconds: 15
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "768Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+  labels:
+    app: order-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8087
+      targetPort: 8087
+  selector:
+    app: order-service
+---
+# ====================================================
+# ANALYTICS SERVICE
+# ====================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-service
+  labels:
+    app: analytics-service
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: analytics-service
+  template:
+    metadata:
+      labels:
+        app: analytics-service
+    spec:
+      containers:
+      - name: analytics-service
+        image: analytics-service:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: JAVA_TOOL_OPTIONS
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: JAVA_TOOL_OPTIONS
+        - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+        - name: EUREKA_INSTANCE_PREFER_IP_ADDRESS
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: EUREKA_INSTANCE_PREFER_IP_ADDRESS
+        - name: SPRING_DATASOURCE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: ANALYTICS_DATASOURCE_URL
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: SPRING_DATASOURCE_USERNAME
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: microservices-secret
+              key: SPRING_DATASOURCE_PASSWORD
+        - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            configMapKeyRef:
+              name: microservices-config
+              key: SPRING_KAFKA_BOOTSTRAP_SERVERS
+        ports:
+        - containerPort: 8088
+        startupProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8088
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 60
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8088
+          periodSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8088
+          periodSeconds: 15
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "768Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-service
+  labels:
+    app: analytics-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8088
+      targetPort: 8088
+  selector:
+    app: analytics-service
+

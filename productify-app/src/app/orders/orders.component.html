@@ -1,0 +1,24 @@
+<p-table [value]="orders" [paginator]="true" [rows]="10" [responsiveLayout]="'scroll'" [resizableColumns]="true">
+    <ng-template pTemplate="header">
+        <tr>
+            <th pResizableColumn>Order ID</th>
+            <th pResizableColumn>User ID</th>
+            <th pResizableColumn>Order Date</th>
+            <th pResizableColumn>Total Amount</th>
+            <th pResizableColumn>Status</th>
+        </tr>
+    </ng-template>
+    <ng-template pTemplate="body" let-order>
+        <tr>
+            <td>#{{ order.orderId }}</td>
+            <td>{{ order.userId }}</td>
+            <td>{{ order.orderDate | date:'medium' }}</td>
+            <td>${{ order.totalAmount }}</td>
+            <td>
+                <span [style.color]="order.status === 'COMPLETED' ? 'green' : 'orange'">
+                    {{ order.status }}
+                </span>
+            </td>
+        </tr>
+    </ng-template>
+</p-table>
